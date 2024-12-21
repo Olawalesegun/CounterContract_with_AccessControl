@@ -1,32 +1,67 @@
-/// Interface representing `HelloContract`.
-/// This interface allows modification and retrieval of the contract balance.
 #[starknet::interface]
-pub trait IHelloStarknet<TContractState> {
-    /// Increase contract balance.
-    fn increase_balance(ref self: TContractState, amount: felt252);
-    /// Retrieve contract balance.
-    fn get_balance(self: @TContractState) -> felt252;
+trait ICounter<T> {
+    fn get_counter(self: @T) -> u32;
+    fn increase_counter(ref self: T);
+    fn decrease_counter(ref self: T);
+    fn reset_counter(ref self: T);
 }
 
-/// Simple contract for managing balance.
+
 #[starknet::contract]
-mod HelloStarknet {
-    use core::starknet::storage::{StoragePointerReadAccess, StoragePointerWriteAccess};
+mod Counter {
+    use super::ICounter;
+    use starknet::ContractAddress;
+    use starknet::storage::{StoragePointerReadAccess, StoragePointerWriteAccess};
 
     #[storage]
     struct Storage {
-        balance: felt252,
+        counter: u32,
+    }
+
+    #[event]
+    #[derive(Drop, starknet::Event)]
+    pub enum Event {
+        CounterIncreased: CounterIncreased,
+        CounterDecreased: CounterDecreased
+    }
+
+    #[derive(Drop, starknet::Event)]
+    struct CounterIncreased{
+        counter: u32
+    }
+
+    #[derive(Drop, starknet::Event)]
+    struct CounterDecreased{
+        counter: u32
+    }
+
+    #[constructor]
+    fn constructor(ref self: ContractState, init_value: u32) {
+        self.counter.write(init_value);
     }
 
     #[abi(embed_v0)]
-    impl HelloStarknetImpl of super::IHelloStarknet<ContractState> {
-        fn increase_balance(ref self: ContractState, amount: felt252) {
-            assert(amount != 0, 'Amount cannot be 0');
-            self.balance.write(self.balance.read() + amount);
+    impl CounterImpl of ICounter<ContractState> {
+        fn get_counter(self: @ContractState) -> u32 {
+           self.counter.read()
         }
 
-        fn get_balance(self: @ContractState) -> felt252 {
-            self.balance.read()
+        fn increase_counter(ref self: ContractState){
+            let old_counter = self.counter.read();
+            let new_counter = old_counter + 1;
+            self.counter.write(new_counter);
+            self.emit(CounterIncreased { counter: new_counter});
+        }
+
+        fn decrease_counter(ref self: ContractState){
+            let old_counter = self.counter.read();
+            let new_counter = old_counter - 1;
+            self.counter.write(new_counter);
+            self.emit(CounterDecreased { counter: new_counter });
+        }
+
+        fn reset_counter(ref self: ContractState){
+            self.counter.write(0);
         }
     }
 }
